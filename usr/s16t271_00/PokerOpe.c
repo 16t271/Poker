@@ -45,7 +45,7 @@
 
 int make_deck(int myhd[], int ud[], int us, int deck[]);
 void cal_exval(int myhd[], int deck[], int exval[]);
-int pick_card(int exval[], int maxex);
+int select_change_hand(int exval[], int maxex);
 void expect_next(int myhd[], int deck[], int exval[]);
 void cal_exval_2(int myhd[], int deck[], int exval[], int the, int num);
 int conbination(int n, int k);
@@ -96,24 +96,33 @@ int strategy(int hd[], int fd[], int cg, int tk, int ud[], int us)
 	float rate[TAKE] = {1.0, 1.5, 2.0, 1.5, 1.0};
 	int myhd[HNUM];
 	int exval[HNUM] = {};
-	int hand, decknum;
+	int hand = -1;
 	int i, j, k, l, max;
 	int point[HNUM] = {};
 	int point_myhd;
 
 	// ポイント切り上げ
-	if (poker_point(myhd) >= MIN_POINT*rate[tk]) {
+	if (poker_point(hd) >= MIN_POINT * rate[tk])
+	{
 		return -1;
 	}
 
 	// デッキ作成
-	decknum = CNUM;
 	int deck[CNUM] = {};
-	for (k = 0; k < HNUM; k++) { deck[myhd[k]] = -1; decknum--; }
-	for (k = 0; k < us; k++) { deck[ud[k]] = -1; decknum--;}
-	
-	// hand = one_future(hd, deck, decknum);
-	hand = two_future(hd, deck, decknum);
+	int decknum = CNUM;
+	for (k = 0; k < HNUM; k++)
+	{
+		deck[hd[k]] = -1;
+		decknum--;
+	}
+	for (k = 0; k < us; k++)
+	{
+		deck[ud[k]] = -1;
+		decknum--;
+	}
+
+	hand = one_future(hd, deck, decknum);
+	// hand = two_future(hd, deck, decknum);
 	return hand;
 }
 
@@ -292,18 +301,18 @@ void cal_exval(int myhd[], int deck[], int exval[]) {
 }
 
 //---最大値の位置を決める---
-int pick_card(int exval[], int maxex) {
+int select_change_hand(int exval[], int maxex) {
 	int k;
-	int pick = -1;
+	int hand = -1;
 
 	//exvalが同点のときどうするか？
 	for (k = 0; k < HNUM; k++) {
-		if (exval[k] >= maxex) {
+		if (maxex < exval[k]) {
 			maxex = exval[k];
-			pick = k;
+			hand = k;
 		}
 	}
-	return pick;
+	return hand;
 }
 
 //---2手先期待値の計算---

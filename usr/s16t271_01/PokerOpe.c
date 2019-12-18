@@ -36,16 +36,21 @@
 
 #include "Poker.h"
 
+#define TAKE 5
+#define CHANGE 7
+#define MIN_POINT 8
 //--------------------------------------------------------------------
 //  関数宣言
 //--------------------------------------------------------------------
 
 int make_deck(int myhd[], int ud[], int us, int deck[]);
 void cal_exval(int myhd[], int deck[], int exval[]);
-int pick_card(int exval[], int maxex);
+int select_change_hand(int exval[], int maxex);
 void expect_next(int myhd[], int deck[], int exval[]);
 void cal_exval_2(int myhd[], int deck[], int exval[], int the, int num);
 int conbination(int n, int k);
+int one_future(int hd[], int deck[], int decknum);
+int two_future(int hd[], int deck[], int decknum);
 
 //====================================================================
 //  戦略
@@ -55,76 +60,199 @@ int conbination(int n, int k);
 //  ユーザ指定
 //--------------------------------------------------------------------
 
-最初の手札のまま交換しない。
-
 hd : 手札配列
 fd : 場札配列(テイク内の捨札)
 cg : チェンジ数
 tk : テイク数
 ud : 捨札配列(過去のテイクも含めた全ての捨札)
 us : 捨札数
+GNUM : ゲーム最大回数
+CNUM : カードの枚数
+HNUM : 手札の枚数
+FNUM : 場札の最大枚数(5×2)
+GAME_NAME_LEN : ゲームのインスタンス名の最大長
+FILE_NAME_LEN : ファイル名の最大長
+DIR_NAME_LEN  : ディレクトリ名の最大長
+COMM_LEN  : コマンド行の最大長
+POINT_MAX : 役番号の最大点
+POINT_MIN : 役番号の最小点
+POINT_NUM : 役番号の最大長
+
+//----  役の配点
+P0 : ノーペア
+P1 : ワンペア
+P2 : ツーペア
+P3 : スリーカインズ
+P4 : ストレート
+P5 : フラッシュ
+P6 : フルハウス
+P7 : フォーカード
+P8 : ストレートフラッシュ
+P9 : ロイヤルストレートフラッシュ
 
 --------------------------------------------------------------------*/
-
 int strategy(int hd[], int fd[], int cg, int tk, int ud[], int us)
 {
+	float rate[TAKE] = {1.0, 1.5, 2.0, 1.5, 1.0};
 	int myhd[HNUM];
 	int exval[HNUM] = {};
-	int the, decknum;
+	int hand = -1;
 	int i, j, k, l, max;
 	int point[HNUM] = {};
 	int point_myhd;
 
-	arr_copy(myhd, hd, HNUM);
-	if(poker_point(myhd) >= P3){
+	// ポイント切り上げ
+	if (poker_point(hd) >= MIN_POINT * rate[tk])
+	{
 		return -1;
 	}
-	// decknum = make_deck(myhd, ud, us, deck);
-	//deck作成
-	decknum = CNUM;
+
+	// デッキ作成
 	int deck[CNUM] = {};
-	for (k = 0; k < HNUM; k++) { deck[myhd[k]] = -1; decknum--; }
-	for (k = 0; k < us; k++) { deck[ud[k]] = -1; decknum--;}
-
-	max = poker_point(myhd) * decknum * (decknum - 1);
-
-	for(i = 0; i < HNUM; i++){
-		for(j  = 0; j < CNUM; j++){
-			//1手交換
-			if(deck[j] == 0) {
-				myhd[i] = j;
-				for(k = 0; k < HNUM; k++){
-					if(k == i) { continue; }
-					for(l = 0; l < CNUM; l++){
-						if(l == j) { continue; };
-						if(deck[l] == 0){
-							myhd[k] = l;
-							exval[i] += poker_point(myhd);
-						}
-					}
-					//2手先の手札の初期化
-					myhd[k] = hd[k];
-				}
-			}
-		}
-		//2手先の手札の初期化
-		myhd[i] = hd[i];
-		printf("%d ", point[i]);
+	int decknum = CNUM;
+	for (k = 0; k < HNUM; k++)
+	{
+		deck[hd[k]] = -1;
+		decknum--;
+	}
+	for (k = 0; k < us; k++)
+	{
+		deck[ud[k]] = -1;
+		decknum--;
 	}
 
-	for(i = 0; i < HNUM; i++){
-		if(max < point[i]){
-			max = point[i];
-			the = i;
-		}
-	}
-
-	return the;
+	hand = one_future(hd, deck, decknum);
+	// hand = two_future(hd, deck, decknum);
+	return hand;
 }
+
+// int strategy(int hd[], int fd[], int cg, int tk, int ud[], int us)
+// {
+// 	int myhd[HNUM];
+// 	int exval[HNUM] = {};
+// 	int the, decknum;
+// 	int i, j, k, l, max;
+// 	int point[HNUM] = {};
+// 	int point_myhd;
+
+// 	arr_copy(myhd, hd, HNUM);
+// 	if(poker_point(myhd) >= P3){
+// 		return -1;
+// 	}
+// 	// decknum = make_deck(myhd, ud, us, deck);
+// 	//deck作成
+// 	decknum = CNUM;
+// 	int deck[CNUM] = {};
+// 	for (k = 0; k < HNUM; k++) { deck[myhd[k]] = -1; decknum--; }
+// 	for (k = 0; k < us; k++) { deck[ud[k]] = -1; decknum--;}
+
+// 	max = poker_point(myhd) * decknum * (decknum - 1);
+
+// 	for(i = 0; i < HNUM; i++){
+// 		for(j  = 0; j < CNUM; j++){
+// 			//1手交換
+// 			if(deck[j] == 0) {
+// 				myhd[i] = j;
+// 				for(k = 0; k < HNUM; k++){
+// 					if(k == i) { continue; }
+// 					for(l = 0; l < CNUM; l++){
+// 						if(l == j) { continue; };
+// 						if(deck[l] == 0){
+// 							myhd[k] = l;
+// 							exval[i] += poker_point(myhd);
+// 						}
+// 					}
+// 					//2手先の手札の初期化
+// 					myhd[k] = hd[k];
+// 				}
+// 			}
+// 		}
+// 		//2手先の手札の初期化
+// 		myhd[i] = hd[i];
+// 		printf("%d ", point[i]);
+// 	}
+
+// 	for(i = 0; i < HNUM; i++){
+// 		if(max < point[i]){
+// 			max = point[i];
+// 			the = i;
+// 		}
+// 	}
+
+// 	return the;
+// }
 
 //====================================================================
 //  補助関数
 //====================================================================
+
+//---1手先読み---
+int one_future(int hd[], int deck[], int decknum){
+	int myhd[HNUM];
+	int exval[HNUM] = {};
+	int i, j, max;
+	int hand = -1;
+
+	for(i = 0; i < HNUM; i++){
+		arr_copy(myhd, hd, HNUM);
+		for(j = 0; j < CNUM; j++){
+			if(deck[j] == 0) {
+				myhd[i] = j;
+				exval[i] += poker_point(myhd);
+			}
+		}
+	}
+	max = poker_point(hd) * decknum;
+	for(i = 0; i < HNUM; i++){
+		if(max < exval[i]){
+			max = exval[i];
+			hand = i;
+		}
+	}
+	return hand;
+}
+
+//---2手先読み---
+int two_future(int hd[], int deck[], int decknum){
+	int myhd[HNUM];    //手札
+	int ofhd[HNUM];    //一手先の手札
+	int exval[HNUM] = {};   //期待値
+	int hand = -1;     //変更手札位置
+	int h_1, h_2, d_1, d_2, max;
+
+	for(h_1 = 0; h_1 < HNUM; h_1++){
+		arr_copy(myhd, hd, HNUM);
+		for(d_1 = 0; d_1 < CNUM; d_1++){
+			if(deck[d_1] == 0) {
+				myhd[h_1] = d_1;
+			}
+			for(h_2 = 0; h_2 < HNUM; h_2++){
+				arr_copy(ofhd, myhd, HNUM);
+				// 手札の同じ場所は変えない?変えてもいい？
+				if(h_1 == h_2){
+					continue;
+				}
+				for(d_2 = 0; d_2 < CNUM; d_2++){
+					if(d_2 == d_1){
+						continue;
+					}
+					else if(deck[d_2] == 0){
+						ofhd[h_2] = d_2;
+						exval[h_1] += poker_point(ofhd);
+					}
+				}
+			}
+		}
+	}
+	max = poker_point(hd) * decknum * (decknum - 1);
+	for(h_1 = 0; h_1 < HNUM; h_1++){
+		if(max < exval[h_1]){
+			max = exval[h_1];
+			hand = h_1;
+		}
+	}
+	return hand;
+}
 
 //---n個の中からk個選ぶ組み合わせ---
 int conbination(int n, int k){
@@ -173,18 +301,18 @@ void cal_exval(int myhd[], int deck[], int exval[]) {
 }
 
 //---最大値の位置を決める---
-int pick_card(int exval[], int maxex) {
+int select_change_hand(int exval[], int maxex) {
 	int k;
-	int pick = -1;
+	int hand = -1;
 
 	//exvalが同点のときどうするか？
 	for (k = 0; k < HNUM; k++) {
-		if (exval[k] >= maxex) {
+		if (maxex < exval[k]) {
 			maxex = exval[k];
-			pick = k;
+			hand = k;
 		}
 	}
-	return pick;
+	return hand;
 }
 
 //---2手先期待値の計算---
